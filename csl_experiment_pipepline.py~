@@ -1,0 +1,242 @@
+__author__ = 'Feng Chen'
+from inference_multi_core_main import inference_apdm_format, list_sum, list_dot_scalar, calculate_measures, sliding_window_extract
+from log import Log
+import os
+import time
+import pickle
+import numpy as np
+from SL_inference import *
+
+
+global paths
+paths = [] 
+global path
+path = []
+
+def findPaths(G, source, target, threshold=10):
+    arcs = []
+    for nei in nx.neighbors(G,source):
+        arc = (source,nei)
+        length = len(path)
+        #path_copy = copy.copy(path)
+        count = 0
+        for (i,j) in path:
+            if nei != i and nei != j:
+                count += 1
+        if count == length:    
+            arcs.append(arc)
+        
+    for arc in arcs:
+        if arc[1] == target and len(path) + 1 <= threshold:
+            path_copy = copy.copy(path)
+            path_copy.append(arc)
+            paths.append(path_copy)
+        elif arc[1] != target and len(path) + 1 <= threshold:
+            path.append(arc)
+            findPaths(G,arc[1],target,threshold)
+            path.remove(arc)
+
+'''
+V = [0, 1, ...] is a list of vertex ids
+E: a list of pairs of vertex ids
+Obs: a dictionary with key edge and its value a list of congestion observations of this edge from t = 1 to t = T
+Omega: a dictionary with key edge and its value a pair of alpha and beta
+E_X: a list of pairs of vertex ids whose opinions will be predicted.
+'''
+def SL_prediction(V,E,Obs,Omega,E_X,flag = 0):
+    '''
+    flag == 0:  if no path between (i,j), fuse opinions of neighbors' edges of i and j 
+         == 1:  not consider fusing neighbor edges
+    '''
+    if flag == 0:
+        G = nx.Graph()   #used for traffic dataset
+    elif flag == 1:
+        G = nx.DiGraph()  # used for trustness dataset
+    else:
+        raise Exception('Wrong flag argument')
+
+    E_known = [e for e in E if e not in E_X]
+    G.add_nodes_from(V)
+    Omega_X = {}
+    print 'number of known edges',len(E_known)
+
+    for e in E_known:
+        source, target = e
+        alpha, beta = Omega[e]
+        op = beta_to_opinion(alpha,beta)
+        G.add_edge(source,target,opinion=op)
+    print 'number of training edges:',len(G.edges())
+
+    Omega_X = {}
+
+    if flag == 0:
+        print 'flag == 0' 
+        while(len(E_X)!=0):
+            for e in E_X:
+                source, target = e
+                #case 1
+                if source not in G.nodes() and target not in G.nodes():
+                    print 'not in G',source,target
+                    print len(E_X)
+                    continue
+                #case 2
+                elif source not in G.nodes():# or target not in G.nodes():
+                    G.add_node(source)
+                    neis = G.neighbors(target)
+                    multi_paths = []
+                    neighbor_path = []
+                    for nei in neis:
+                        if (target,nei) in G.edges():
+                            neighbor_path.append((target,nei))
+                        if (nei, target)in G.edges():
+                            neighbor_path.append((nei,target))
+                    if neighbor_path == []:
+                        raise Exception('errrror 1')
+                    else:
+                        multi_paths.append(neighbor_path)
+                    op = computeOpinion(G,e,multi_paths)
+                    G.add_edge(source,target,opinion = op)
+                    Omega_X[e] = opinion_to_beta(op)
+                    E_X.remove(e)
+                #case 3
+                elif target not in G.nodes(): 
+                    G.add_node(target)
+                    neis = G.neighbors(source)
+                    multi_paths = []
+                    neighbor_path = []
+                    for nei in neis:
+                        if (source,nei) in G.edges():
+                            neighbor_path.append((source,nei))
+                        if (nei, source)in G.edges():
+                            neighbor_path.append((nei,source))
+                    if neighbor_path == []:
+                        raise Exception('errrror 1')
+                    else:
+                        multi_paths.append(neighbor_path)
+                    op = computeOpinion(G,e,multi_paths)
+                    G.add_edge(source,target,opinion = op)
+                    Omega_X[e] = opinion_to_beta(op)
+                    E_X.remove(e)
+                #case 4
+                else:
+                    findPaths(G,source, target)
+                    global paths
+                    print e, paths
+                    if paths != []:
+                        total_opinion = computeOpinion(G,e,paths)
+                        G.add_edge(source, target, opinion = total_opinion)
+                        Omega_X[e] = opinion_to_beta(total_opinion)
+                        paths = []
+                        E_X.remove(e) 
+                    else:
+                        neis = G.neighbors(source) + G.neighbors(target)
+                        multi_paths = []
+                        neighbor_path = []
+                        for nei in neis:
+                            if (source,nei) in G.edges():
+                                neighbor_path.append((source,nei))
+                            if (nei, source)in G.edges():
+                                neighbor_path.append((nei,source))
+                            if (target,nei) in G.edges():
+                                neighbor_path.append((target,nei))
+                            if (nei,target) in G.edges():
+                                neighbor_path.append((nei,target))
+                        if neighbor_path == []:
+                            raise Exception('No Neighbor Paths')
+                        else:
+                            multi_paths.append(neighbor_path)
+                            total_opinion = computeOpinion(G,e,multi_paths)
+                            G.add_edge(source, target, opinion = total_opinion)
+                            Omega_X[e] = opinion_to_beta(total_opinion)
+                            E_X.remove(e) 
+    elif flag == 1:
+        while(len(E_X)!=0):
+            for e in E_X:
+                print 'testing edge',e
+                source, target = e
+                findPaths(G,source, target)
+                global paths
+                print e, paths
+                if paths != []:
+                    total_opinion = computeOpinion(G,e,paths)
+                    G.add_edge(source, target, opinion = total_opinion)
+                    Omega_X[e] = opinion_to_beta(total_opinion)
+                    paths = []  #set global variable paths to [] to ensure next function call of findPaths()
+                    E_X.remove(e)                
+                else:
+                    raise Exception('no path found on edge:',e)
+    else:
+        raise Exception('wrong flag parameter')
+    #print G.number_of_nodes()
+    #print G.number_of_edges()
+    return Omega_X
+ 
+
+
+def generateData(percent=0.05):
+    dw = DataWrapper()
+    V, E, Obs, G = dw.data_wrapper()
+
+    Omega = obs_to_omega(Obs)
+    sizeE = len(E)
+    E_X = random.sample(E,int(round(sizeE*percent)))
+    if len(E_X) == 0:
+        raise Exception('HAHA EMPTY X HERE')
+
+    print('number of nodes: {}'.format(len(V)))
+    print('number of edges: {}'.format(len(E)))
+    print('number of cc: {}'.format(nx.number_connected_components(G)))
+    outfile = open('data/data.pkl','w')
+
+    pickle.dump([V,E,Omega,Obs,E_X],outfile)
+
+
+
+
+def main():
+    window_size = 3
+    begin_time = 0
+    end_time = 5
+    logging = Log("log.txt")
+    filename = "data/data.pkl"
+    if os.path.exists(filename):
+        running_starttime = time.time()
+        pkl_file = open(filename, 'rb')
+        [V, E, Omega, Obs, X] = pickle.load(pkl_file)
+        if len(X) == 0:
+            raise Exception('EMPTY X 2')
+        pkl_file.close()
+        logging.write('\r\n\r\nfilename: {0}, #nodes: {1}, #edges: {2}'.format(filename, len(V), len(E)))
+
+        sw_measures = []
+        for start_t in range(begin_time, end_time-window_size+1):
+            print "sliding window: {0} to {1}".format(start_t, start_t + window_size)
+            logging.write("\r\n sliding window: {0} to {1}".format(start_t, start_t + window_size))
+            sw_Omega, sw_Obs = sliding_window_extract(Omega, Obs, start_t, window_size)
+            #pred_omega_x = inference_apdm_format(V, E, sw_Obs, sw_Omega, X, logging)
+            if len(X) == 0: 
+                raise Exception('EMPTY X')
+            X_copy = [e for e in X]
+            pred_omega_x = SL_prediction(V,E,sw_Obs,sw_Omega,X_copy)
+
+            prob_mse, u_mse, prob_relative_mse, u_relative_mse, accuracy, recall_congested, recall_uncongested = calculate_measures(sw_Omega, pred_omega_x, X, logging)
+            sw_measures.append([prob_mse, u_mse, prob_relative_mse, u_relative_mse, accuracy, recall_congested, recall_uncongested])
+
+
+        avg_measures = [0, 0, 0, 0, 0, 0, 0]
+        for measures in sw_measures:
+            avg_measures = list_sum(avg_measures, measures)
+        avg_measures = list_dot_scalar(avg_measures, 1.0 / len(sw_measures))
+        logging.write("\r\n ----------------Summary of the results--------------------")
+        logging.write("prob_mse: {0}, u_mse: {1}, prob_relative_mse: {2}, u_relative_mse: {3}".format(prob_mse, u_mse, prob_relative_mse, u_relative_mse))
+        logging.write("accuracy: {0}, recall_congested: {1}, recall_uncongested: {2}".format(accuracy, recall_congested, recall_uncongested))
+
+        running_endtime = time.time()
+        logging.write("\r\n running time: {0} seconds".format(running_endtime - running_starttime))
+
+
+
+if __name__=='__main__':
+    generateData()
+    main()
+

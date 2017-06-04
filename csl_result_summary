@@ -1,0 +1,41 @@
+File:  weekday 0, hour 8
+ ----------------Summary of the results--------------------prob_mse: 0.413678364021
+, u_mse: 0.0999200319872
+, prob_relative_mse: 28.6880826329
+, u_relative_mse: 0.4998
+accuracy: 0.591949486977
+, recall_congested: 0.32550569635
+, recall_uncongested: 0.9391093608
+processing time 121.829842091File:  weekday 0, hour 9
+ ----------------Summary of the results--------------------prob_mse: 0.573143975519
+, u_mse: 0.0999200319872
+, prob_relative_mse: 53.1777080828
+, u_relative_mse: 0.4998
+accuracy: 0.394632991318
+, recall_congested: 0.28328611898
+, recall_uncongested: 0.811992504685
+processing time 120.747391939File:  weekday 0, hour 10
+ ----------------Summary of the results--------------------prob_mse: 0.46099983251
+, u_mse: 0.0999200319872
+, prob_relative_mse: 135.243829965
+, u_relative_mse: 0.4998
+accuracy: 0.49986845567
+, recall_congested: 0.282547272332
+, recall_uncongested: 0.833055648117
+processing time 133.50863409File:  weekday 0, hour 11
+ ----------------Summary of the results--------------------prob_mse: 0.468538327981
+, u_mse: 0.0999200319872
+, prob_relative_mse: 94.6512675579
+, u_relative_mse: 0.4998
+accuracy: 0.552486187845
+, recall_congested: 0.32601608346
+, recall_uncongested: 0.899700099967
+processing time 135.954121828File:  weekday 0, hour 12
+ ----------------Summary of the results--------------------prob_mse: 0.453311559481
+, u_mse: 0.0999200319872
+, prob_relative_mse: 150.745115199
+, u_relative_mse: 0.4998
+accuracy: 0.526177321757
+, recall_congested: 0.292611558157
+, recall_uncongested: 0.799771493859
+processing time 136.855134964
