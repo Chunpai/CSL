@@ -10,7 +10,7 @@ import random
 #from SLOperators import transitivity
 #from SLOperators import fusion
 from random import randint
-from DataWrapper import *
+from hourly_data.DataWrapper import *
 
 
 
@@ -21,7 +21,7 @@ paths = []
 global path
 path = []
 
-def findPaths(G, source, target, threshold=10):
+def findPaths(G, source, target, threshold=5):
     arcs = []
     for nei in nx.neighbors(G,source):
         arc = (source,nei)
@@ -270,6 +270,11 @@ def transitivity(o1, o2):
     o[1] = o1[0] * o2[1]
     o[2] = o1[1] + o1[2] + o1[0] * o2[2]
     o[3] = o2[3]
+
+    s = o[0] + o[1] + o[2]
+    o[0] = o[0]/s
+    o[1] = o[1]/s
+    o[2] = o[2]/s
     return o
 
 def fusion(o1, o2):
@@ -278,6 +283,10 @@ def fusion(o1, o2):
     o[1] = (o1[1] * o2[2] + o2[1] * o1[2]) / (o1[2] + o2[2] - o1[2] * o2[2])
     o[2] = (o1[2] * o2[2]) / (o1[2] + o2[2] - o1[2] * o2[2])
     o[3] = o1[3]
+    s = o[0] + o[1] + o[2]
+    o[0] = o[0]/s
+    o[1] = o[1]/s
+    o[2] = o[2]/s
     return o
 
 
